@@ -205,7 +205,7 @@ if fiscfree_file:
             "aantal_bestellingen_max_budget_gelijk",
             "aantal_bestellingen_max_budget_ongelijk",
             "aantal_bestellingen_>15%",
-            "pct_grote_delta",                           # ← after grote‑delta count
+            "pct_delta_>15%",                           # ← after grote‑delta count
             "aantal_bestellingen_<=15%",
             "aantal_bestellingen_>25%"
         ]

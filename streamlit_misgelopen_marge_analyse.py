@@ -21,9 +21,10 @@ mail_fiscfree = pd.read_excel("data/mail_fiscfree.xlsx")
 
 if fiscfree_file:
 
-    # Read the uploaded files into dataframes
-    fiscfree = pd.read_excel(fiscfree_file)
-
+    with st.spinner("FiscFree‑bestand wordt ingeladen…"):
+        fiscfree = pd.read_excel(fiscfree_file)
+    
+    st.success("FiscFree‑bestand succesvol ingelezen! Druk op Run Analyse om verder te gaan...")
     # Add a button to run analysis
     if st.button("Run Analysis"):
         # 2. Fast 1‑to‑1 match (vectorised):   Artikelnr ↔ Ean Code

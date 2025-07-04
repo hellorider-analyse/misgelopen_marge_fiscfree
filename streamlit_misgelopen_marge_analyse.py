@@ -13,7 +13,7 @@ st.title("FiscFree / Hellorider Analyse")
 
 with st.spinner:
     # 1. User uploads only the FiscFree Excel file
-    fiscfree_file = st.file_uploader("Upload FiscFree Excel", type=["xlsx"])
+    fiscfree_file = st.file_uploader("Upload FiscFree Excel file", type=["xlsx"])
     
     # 2. Load the other reference files from disk (bundled in the app)
     hellorider = pd.read_excel("data/20250627 - Hellorider - Export.xlsx")

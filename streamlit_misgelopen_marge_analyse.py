@@ -11,19 +11,18 @@ import pandas as pd
 
 st.title("FiscFree / Hellorider Analysis")
 
-# 1. Upload input files via Streamlit file uploader widgets
-fiscfree_file     = st.file_uploader("Upload FiscFree Excel", type=["xlsx"])
-hellorider_file   = st.file_uploader("Upload Hellorider Excel", type=["xlsx"])
-bike_totaal_file  = st.file_uploader("Upload Bike Totaal Excel", type=["xlsx"])
-mail_fiscfree_file = st.file_uploader("Upload mail_fiscfree Excel", type=["xlsx"])
+# 1. User uploads only the FiscFree Excel file
+fiscfree_file = st.file_uploader("Upload FiscFree Excel", type=["xlsx"])
 
-if fiscfree_file and hellorider_file and bike_totaal_file and mail_fiscfree_file:
+# 2. Load the other reference files from disk (bundled in the app)
+hellorider = pd.read_excel("data/20250627 - Hellorider - Export.xlsx")
+bike_totaal = pd.read_excel("data/20250630 - DRG Dealers - Overzicht.xlsx", skiprows=6)
+mail_fiscfree = pd.read_excel("data/mail_fiscfree.xlsx")
+
+if fiscfree_file:
 
     # Read the uploaded files into dataframes
     fiscfree = pd.read_excel(fiscfree_file)
-    hellorider = pd.read_excel(hellorider_file)
-    bike_totaal = pd.read_excel(bike_totaal_file, skiprows=6)
-    mail_fiscfree = pd.read_excel(mail_fiscfree_file)
 
     # Add a button to run analysis
     if st.button("Run Analysis"):

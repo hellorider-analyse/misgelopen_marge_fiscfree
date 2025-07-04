@@ -23,36 +23,44 @@ if fiscfree_file:
 
     # Read the uploaded files into dataframes
     fiscfree = pd.read_excel(fiscfree_file)
+    st.success("Bestand succesvol ingelezen. Analyse wordt gestart...")
 
     # Add a button to run analysis
     if st.button("Run Analysis"):
         # 2. Fast 1‑to‑1 match (vectorised):   Artikelnr ↔ Ean Code
         # ---------------------------------------------------------------------
         # keep the FIRST occurrence of each Ean Code  ➜ guarantees a 1‑to‑1 join
-        lookup_cols = ["Ean Code", "Brand", "Msrp Ex Vat", "Name"]
+        lookup_cols = ["Ean Code", "Brand", "Msrp Ex Vat", "Name", "Ebike Type"]
         lookup = (
             hellorider[lookup_cols]
-                .drop_duplicates(subset="Ean Code")          # <-- new line
+                .drop_duplicates(subset="Ean Code")
                 .rename(columns={
                     "Ean Code":    "Artikelnr",
                     "Brand":       "Brand_hr",
                     "Msrp Ex Vat": "adviesprijs",
                     "Name":        "Naam Hellorider",
+                    "Ebike Type":  "Ebike Type",
                 })
         )
 
-        # now the merge is “many‑to‑ONE”; validate='m:1' makes pandas raise
-        # if duplicates ever sneak back in.
         fiscfree = fiscfree.merge(
             lookup,
             how="left",
             on="Artikelnr",
-            validate="m:1"     # many‑to‑one
+            validate="m:1"
         )
 
         brand_match = fiscfree["Brand_hr"].str.lower() == fiscfree["Merk"].str.lower()
-        fiscfree.loc[~brand_match, ["adviesprijs", "Naam Hellorider"]] = np.nan
-        fiscfree["Artikelnummer check"] = brand_match
+
+        fiets_type_check = (
+            ((fiscfree["Soort Fiets"].str.lower() == "elektrisch") & fiscfree["Ebike Type"].notna()) |
+            ((fiscfree["Soort Fiets"].str.lower() == "normaal") & fiscfree["Ebike Type"].isna())
+        )
+
+        valid_match = brand_match & fiets_type_check
+
+        fiscfree.loc[~valid_match, ["adviesprijs", "Naam Hellorider"]] = np.nan
+        fiscfree["Artikelnummer check"] = valid_match
 
 
         # ---------------------------------------------------------------------
@@ -66,15 +74,28 @@ if fiscfree_file:
         merk_low  = fiscfree["Merk"].str.lower()
         name_low  = hellorider["Name"].str.lower().str.replace(" ", "", regex=False)
         brand_low = hellorider["Brand"].str.lower()
+        ebike_isna = hellorider["Ebike Type"].isna()     # pre‑compute once
+        ebike_notna = ~ebike_isna 
         
         progress_bar = st.progress(0)
         total = need.sum()
         
         for count, i in enumerate(fiscfree[need].index, start=1):
-            candidates = hellorider[
-                brand_low.eq(merk_low[i]) &
-                name_low.str.contains(type_low[i], regex=False)
-            ]
+            # 1.  brand & type match (the original two conditions)
+            cond = brand_low.eq(merk_low[i]) & name_low.str.contains(type_low[i], regex=False)
+            
+            # -------------------------------------------------------------
+            # 2.  bike‑type consistency
+            soort = str(fiscfree.at[i, "Soort Fiets"]).strip().lower()
+            if soort == "elektrisch":
+                cond &= ebike_notna          # Hellorider must have an Ebike Type
+            elif soort == "normaal":
+                cond &= ebike_isna           # Hellorider must *not* have Ebike Type
+            # else (unknown value) → keep the original cond unchanged
+            
+            # -------------------------------------------------------------
+            # 3.  pick the first candidate that satisfies all conditions
+            candidates = hellorider[cond]
             if not candidates.empty:
                 fiscfree.at[i, "adviesprijs"]     = candidates["Msrp Ex Vat"].iloc[0]
                 fiscfree.at[i, "Naam Hellorider"] = candidates["Name"].iloc[0]
@@ -148,11 +169,39 @@ if fiscfree_file:
               )
               .reset_index()
         )
+        misgelopen_df["aantal_bestellingen_>=15%"] = misgelopen_df.pop("aantal_bestellingen_grote_delta")
+        misgelopen_df["aantal_bestellingen_<=15%"] = misgelopen_df.pop("aantal_bestellingen_kleine_delta")
+
+        # --- 1. percentage max‑budget‑gelijk (after the 3rd column) ---------------
+        misgelopen_df["pct_max_budget_gelijk"] = (
+            100 * misgelopen_df["aantal_bestellingen_max_budget_gelijk"]
+                 / misgelopen_df["totaal_bestellingen"]
+        ).round(2)
+
+        # --- 2. percentage grote‑delta (after the grote‑delta count column) -------
+        misgelopen_df["pct_grote_delta"] = (
+            100 * misgelopen_df["aantal_bestellingen_>=15%"]
+                 / misgelopen_df["totaal_bestellingen"]
+        ).round(2)
+
+        # --- 3. reorder columns to the required positions -------------------------
+        cols = [
+            "periode",
+            "totaal_misgelopen_marge",
+            "totaal_bestellingen",
+            "pct_max_budget_gelijk",                      # ← after 3rd column
+            "aantal_bestellingen_max_budget_gelijk",
+            "aantal_bestellingen_max_budget_ongelijk",
+            "aantal_bestellingen_>=15%",
+            "pct_grote_delta",                           # ← after grote‑delta count
+            "aantal_bestellingen_<=15%",
+        ]
+        misgelopen_df = misgelopen_df[cols]
 
 
         # ---------------------------------------------------------------------
         misgelopen_df_leverancier = (
-            fiscfree
+            fiscfree[fiscfree["periode"] == "Vanaf 2-4-2025"]
               .groupby("Leveranciervestiging")
               .agg(
                   totaal_misgelopen_marge          = ("Marge delta >15%", "sum"),
@@ -170,6 +219,9 @@ if fiscfree_file:
               )
               .reset_index()
         )
+
+        misgelopen_df_leverancier["aantal_bestellingen_>=15%"] = misgelopen_df_leverancier.pop("aantal_bestellingen_grote_delta")
+        misgelopen_df_leverancier["aantal_bestellingen_<=15%"] = misgelopen_df_leverancier.pop("aantal_bestellingen_kleine_delta")
 
         # ---------------------------------------------------------------------
         # 6. Marge per leverancier (vanaf 2‑4‑2025 & delta > 1)
@@ -202,44 +254,44 @@ if fiscfree_file:
         # 8. Bike‑Totaal ‘Formule’ veld koppelen
         # ---------------------------------------------------------------------
 
-        bike_totaal["email_clean"]       = bike_totaal["E mail"].str.strip().str.lower()
-        mail_fiscfree["email_clean"]     = (
-            mail_fiscfree["leverancier_vestiging_email"].str.strip().str.lower()
-        )
-
-        # (optional) drop rows whose e‑mail is missing
-        bike_totaal  = bike_totaal.dropna(subset=["email_clean"])
+        # ------------------------------------------------------------------
+        # Build the mapping once
+        # ------------------------------------------------------------------
+        bike_totaal["email_clean"]   = bike_totaal["E mail"].str.strip().str.lower()
+        mail_fiscfree["email_clean"] = mail_fiscfree["leverancier_vestiging_email"].str.strip().str.lower()
+        
+        bike_totaal   = bike_totaal.dropna(subset=["email_clean"])
         mail_fiscfree = mail_fiscfree.dropna(subset=["email_clean"])
-
-        # ------------------------------------------------------------------
-        # 2. Inner‑join on the cleaned address – duplicates are handled automatically
-        # ------------------------------------------------------------------
+        
         bike_tot_df = (
             mail_fiscfree[["email_clean", "leverancier_vestiging_naam"]]
               .merge(
                   bike_totaal[["email_clean", "Formule"]],
                   on="email_clean",
-                  how="left"          # keep only rows that exist in *both* table        # many‑to‑one: raises if the same e‑mail
-                                        # is paired to *different* Formules
+                  how="left"
               )
               .rename(columns={"leverancier_vestiging_naam": "Naam"})
               .dropna(subset=["Naam"])
-              .drop_duplicates(subset=["Naam", "Formule"])  # optional cleanup
+              .drop_duplicates(subset=["Naam", "Formule"])
+              # keep ONLY the two columns we really need
+              [["Naam", "Formule"]]
               .reset_index(drop=True)
         )
-
-        # bike_tot_df now has perfectly aligned 'Naam' and 'Formule' columns
-
-
+        
+        # ------------------------------------------------------------------
+        # Add 'Formule' to any dataframe without bringing along e‑mail or index
+        # ------------------------------------------------------------------
         def add_formule(df, key="Leveranciervestiging"):
-            return df.merge(
-                bike_tot_df.rename(columns={"Naam": key}),
-                how="left", on=key
-            ).assign(Formule = lambda d: d["Formule"].fillna("N.v.t."))
-
+            return (
+                df.merge(bike_tot_df.rename(columns={"Naam": key}),
+                         how="left", on=key)
+                  .assign(Formule=lambda d: d["Formule"].fillna("N.v.t."))
+            )
+        
         misgelopen_df_leverancier = add_formule(misgelopen_df_leverancier)
-        marge_per_leverancier = add_formule(marge_per_leverancier)
-        bestelling_fraude     = add_formule(bestelling_fraude)
+        marge_per_leverancier     = add_formule(marge_per_leverancier)
+        bestelling_fraude         = add_formule(bestelling_fraude)
+
 
         # re‑order columns to match the R output
         keep_first = ["Leveranciervestiging", "Formule"]
@@ -251,10 +303,10 @@ if fiscfree_file:
         from io import BytesIO
         output = BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            misgelopen_df.to_excel(writer, sheet_name="Misgelopen marge per periode", index=False)
-            misgelopen_df_leverancier.to_excel(writer, sheet_name="Misgelopen marge per leverancier", index=False)
-            marge_per_leverancier.to_excel(writer, sheet_name="Bestellingen verschil >15%")
-            bestelling_fraude.to_excel(writer, sheet_name="Bestellingen met fraude")
+            misgelopen_df.to_excel(writer, sheet_name="Totaal overzicht", index=False)
+            misgelopen_df_leverancier.to_excel(writer, sheet_name="Leveranciers overzicht", index=False)
+            marge_per_leverancier.to_excel(writer, sheet_name="Bestellingen verschil >15%", index=False)
+            bestelling_fraude.to_excel(writer, sheet_name="Bestellingen verkoopprijs=max_budget", index=False)
             fiscfree.to_excel(writer, sheet_name="Alle data Fiscfree", index=False)
             # Add other sheets as needed
         output.seek(0)

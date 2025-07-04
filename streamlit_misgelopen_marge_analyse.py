@@ -211,7 +211,10 @@ if fiscfree_file:
             "aantal_bestellingen_>25%"
         ]
         misgelopen_df = misgelopen_df[cols]
-
+        # Make sure the DataFrame isn’t empty first
+        if not misgelopen_df.empty:
+            misgelopen_df["Comment"] = ""                     # 1. add column filled with blanks
+            misgelopen_df.at[misgelopen_df.index[0], "Comment"] = "Om appels met appels te vergelijken wordt de marge voor 2-4-2025 ook berekend met 10% van de verkoopprijs"
 
         # ---------------------------------------------------------------------
         misgelopen_df_leverancier = (

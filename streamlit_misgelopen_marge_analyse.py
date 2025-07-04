@@ -9,7 +9,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
-st.title("FiscFree / Hellorider Analysis")
+st.title("FiscFree / Hellorider Analyse")
 
 # 1. User uploads only the FiscFree Excel file
 fiscfree_file = st.file_uploader("Upload FiscFree Excel", type=["xlsx"])
@@ -23,7 +23,6 @@ if fiscfree_file:
 
     # Read the uploaded files into dataframes
     fiscfree = pd.read_excel(fiscfree_file)
-    st.success("Bestand succesvol ingelezen. Analyse wordt gestart...")
 
     # Add a button to run analysis
     if st.button("Run Analysis"):

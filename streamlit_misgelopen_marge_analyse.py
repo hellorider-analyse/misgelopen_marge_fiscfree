@@ -106,9 +106,6 @@ if fiscfree_file and hellorider_file and bike_totaal_file and mail_fiscfree_file
         # ---------------------------------------------------------------------
         # 5. Δ‑marge berekeningen
         # ---------------------------------------------------------------------
-        tmp = fiscfree.dropna(subset=["adviesprijs"]).copy()
-        tmp["delta"] = 0.10 * (tmp["adviesprijs"] - tmp["bedraghoofdproductincl"])
-        tmp = tmp[tmp["delta"] > 0]
         fiscfree["delta"] = np.where(
             fiscfree["adviesprijs"].notna(),
             0.10 * (fiscfree["adviesprijs"] - fiscfree["bedraghoofdproductincl"]),
@@ -256,6 +253,9 @@ if fiscfree_file and hellorider_file and bike_totaal_file and mail_fiscfree_file
         output = BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             misgelopen_df.to_excel(writer, sheet_name="Misgelopen marge per periode", index=False)
+            misgelopen_df_leverancier.to_excel(writer, sheet_name="Misgelopen marge per leverancier", index=False)
+            marge_per_leverancier.to_excel(writer, sheet_name="Bestellingen verschil >15%")
+            bestelling_fraude.to_excel(writer, sheet_name="Bestellingen met fraude")
             fiscfree.to_excel(writer, sheet_name="Alle data Fiscfree", index=False)
             # Add other sheets as needed
         output.seek(0)

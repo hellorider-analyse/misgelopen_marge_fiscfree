@@ -11,20 +11,20 @@ import pandas as pd
 
 st.title("FiscFree / Hellorider Analyse")
 
-# 1. User uploads only the FiscFree Excel file
-fiscfree_file = st.file_uploader("Upload FiscFree Excel", type=["xlsx"])
-
-# 2. Load the other reference files from disk (bundled in the app)
-hellorider = pd.read_excel("data/20250627 - Hellorider - Export.xlsx")
-bike_totaal = pd.read_excel("data/20250630 - DRG Dealers - Overzicht.xlsx", skiprows=6)
-mail_fiscfree = pd.read_excel("data/mail_fiscfree.xlsx")
+with st.spinner:
+    # 1. User uploads only the FiscFree Excel file
+    fiscfree_file = st.file_uploader("Upload FiscFree Excel", type=["xlsx"])
+    
+    # 2. Load the other reference files from disk (bundled in the app)
+    hellorider = pd.read_excel("data/20250627 - Hellorider - Export.xlsx")
+    bike_totaal = pd.read_excel("data/20250630 - DRG Dealers - Overzicht.xlsx", skiprows=6)
+    mail_fiscfree = pd.read_excel("data/mail_fiscfree.xlsx")
+st.success("FiscFree‑bestand succesvol ingelezen! Druk op Run Analyse om verder te gaan...")
 
 if fiscfree_file:
 
-    with st.spinner("FiscFree‑bestand wordt ingeladen…"):
-        fiscfree = pd.read_excel(fiscfree_file)
+    fiscfree = pd.read_excel(fiscfree_file)
     
-    st.success("FiscFree‑bestand succesvol ingelezen! Druk op Run Analyse om verder te gaan...")
     # Add a button to run analysis
     if st.button("Run Analysis"):
         # 2. Fast 1‑to‑1 match (vectorised):   Artikelnr ↔ Ean Code

@@ -178,13 +178,13 @@ if fiscfree_file:
         misgelopen_df["pct_max_budget_gelijk"] = (
             100 * misgelopen_df["aantal_bestellingen_max_budget_gelijk"]
                  / misgelopen_df["totaal_bestellingen"]
-        ).round(2)
-
-        # --- 2. percentage grote‑delta (after the grote‑delta count column) -------
+        ).round(2).astype(str) + "%"
+        
         misgelopen_df["pct_grote_delta"] = (
             100 * misgelopen_df["aantal_bestellingen_>=15%"]
                  / misgelopen_df["totaal_bestellingen"]
-        ).round(2)
+        ).round(2).astype(str) + "%"
+
 
         # --- 3. reorder columns to the required positions -------------------------
         cols = [

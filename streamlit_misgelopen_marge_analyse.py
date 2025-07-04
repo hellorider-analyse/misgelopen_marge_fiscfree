@@ -137,6 +137,9 @@ if fiscfree_file:
         fiscfree["Diff >15%"] = (
             fiscfree["bedraghoofdproductincl"] < 0.85 * fiscfree["adviesprijs"]
         )
+        fiscfree["Diff >25%"] = (
+            fiscfree["bedraghoofdproductincl"] < 0.75 * fiscfree["adviesprijs"]
+        )
         fiscfree["Marge delta >15%"] = (
             (fiscfree["adviesprijs"] - fiscfree["bedraghoofdproductincl"]) * 0.10
         ).where(fiscfree["Diff >15%"])
@@ -169,11 +172,13 @@ if fiscfree_file:
                       "Marge delta >15%",
                       lambda s: s.isna().sum() + (s <= 0).sum()  # count where <=0 or NaN
                   ),
+                  aantal_bestellingen_delta_25 = ("Diff >25%", "sum")
               )
               .reset_index()
         )
-        misgelopen_df["aantal_bestellingen_>=15%"] = misgelopen_df.pop("aantal_bestellingen_grote_delta")
+        misgelopen_df["aantal_bestellingen_>15%"] = misgelopen_df.pop("aantal_bestellingen_grote_delta")
         misgelopen_df["aantal_bestellingen_<=15%"] = misgelopen_df.pop("aantal_bestellingen_kleine_delta")
+        misgelopen_df["aantal_bestellingen_>25%"] = misgelopen_df.pop("aantal_bestellingen_delta_25")
 
         # --- 1. percentage max‑budget‑gelijk (after the 3rd column) ---------------
         misgelopen_df["pct_max_budget_gelijk"] = (
@@ -181,8 +186,13 @@ if fiscfree_file:
                  / misgelopen_df["totaal_bestellingen"]
         ).round(2).astype(str) + "%"
         
-        misgelopen_df["pct_grote_delta"] = (
-            100 * misgelopen_df["aantal_bestellingen_>=15%"]
+        misgelopen_df["pct_delta_>15%"] = (
+            100 * misgelopen_df["aantal_bestellingen_>15%"]
+                 / misgelopen_df["totaal_bestellingen"]
+        ).round(2).astype(str) + "%"
+        
+        misgelopen_df["pct_delta_>25%"] = (
+            100 * misgelopen_df["aantal_bestellingen_>25%"]
                  / misgelopen_df["totaal_bestellingen"]
         ).round(2).astype(str) + "%"
 
@@ -195,9 +205,10 @@ if fiscfree_file:
             "pct_max_budget_gelijk",                      # ← after 3rd column
             "aantal_bestellingen_max_budget_gelijk",
             "aantal_bestellingen_max_budget_ongelijk",
-            "aantal_bestellingen_>=15%",
+            "aantal_bestellingen_>15%",
             "pct_grote_delta",                           # ← after grote‑delta count
             "aantal_bestellingen_<=15%",
+            "aantal_bestellingen_>25%"
         ]
         misgelopen_df = misgelopen_df[cols]
 
@@ -219,12 +230,14 @@ if fiscfree_file:
                       "Marge delta >15%",
                       lambda s: s.isna().sum() + (s <= 0).sum()  # count where <=0 or NaN
                   ),
+                  aantal_bestellingen_delta_25 = ("Diff >25%", "sum")
               )
               .reset_index()
         )
 
-        misgelopen_df_leverancier["aantal_bestellingen_>=15%"] = misgelopen_df_leverancier.pop("aantal_bestellingen_grote_delta")
+        misgelopen_df_leverancier["aantal_bestellingen_>15%"] = misgelopen_df_leverancier.pop("aantal_bestellingen_grote_delta")
         misgelopen_df_leverancier["aantal_bestellingen_<=15%"] = misgelopen_df_leverancier.pop("aantal_bestellingen_kleine_delta")
+        misgelopen_df_leverancier["aantal_bestellingen_>25%"] = misgelopen_df_leverancier.pop("aantal_bestellingen_delta_25")
 
         # ---------------------------------------------------------------------
         # 6. Marge per leverancier (vanaf 2‑4‑2025 & delta > 1)
@@ -233,6 +246,18 @@ if fiscfree_file:
             fiscfree[
                 (fiscfree["periode"] == "Vanaf 2-4-2025") &
                 fiscfree["Marge delta >15%"].gt(0)  # checks if > 0 and not null
+            ]
+            .loc[:, [
+                "Leveranciervestiging", "Bestelnummer", "adviesprijs", "bedraghoofdproductincl",
+                "Merk", "Type", "Naam Hellorider", "Besteldatum"
+            ]]
+            .sort_values("Leveranciervestiging")
+        )
+        
+        marge_per_leverancier_25 = (
+            fiscfree[
+                (fiscfree["periode"] == "Vanaf 2-4-2025") &
+                fiscfree["Diff >25%"]  # checks if > 0 and not null
             ]
             .loc[:, [
                 "Leveranciervestiging", "Bestelnummer", "adviesprijs", "bedraghoofdproductincl",
@@ -312,6 +337,7 @@ if fiscfree_file:
                 misgelopen_df.to_excel(writer, sheet_name="Totaal overzicht", index=False)
                 misgelopen_df_leverancier.to_excel(writer, sheet_name="Leveranciers overzicht", index=False)
                 marge_per_leverancier.to_excel(writer, sheet_name="Bestellingen verschil >15%", index=False)
+                marge_per_leverancier.to_excel(writer, sheet_name="Bestellingen verschil >25%")
                 bestelling_fraude.to_excel(writer, sheet_name="Verkoopprijs=max_budget", index=False)
                 fiscfree.to_excel(writer, sheet_name="Alle data Fiscfree", index=False)
                 # Add other sheets as needed

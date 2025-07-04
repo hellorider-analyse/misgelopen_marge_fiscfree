@@ -67,39 +67,42 @@ if fiscfree_file:
         #    – only for rows whose price is still NA
         # ---------------------------------------------------------------------
         
-        need = fiscfree["adviesprijs"].isna()
+        # -------------------------------------------------------------
+        # Fuzzy match FiscFree ↔ Hellorider with progress bar + spinner
+        # -------------------------------------------------------------
+        with st.spinner("Zoeken naar matches FiscFree en Hellorider..."):
         
-        type_low  = fiscfree["Type"].str.lower().str.replace(" ", "", regex=False)
-        merk_low  = fiscfree["Merk"].str.lower()
-        name_low  = hellorider["Name"].str.lower().str.replace(" ", "", regex=False)
-        brand_low = hellorider["Brand"].str.lower()
-        ebike_isna = hellorider["Ebike Type"].isna()     # pre‑compute once
-        ebike_notna = ~ebike_isna 
+            need = fiscfree["adviesprijs"].isna()
         
-        progress_bar = st.progress(0)
-        total = need.sum()
+            type_low   = fiscfree["Type"].str.lower().str.replace(" ", "", regex=False)
+            merk_low   = fiscfree["Merk"].str.lower()
+            name_low   = hellorider["Name"].str.lower().str.replace(" ", "", regex=False)
+            brand_low  = hellorider["Brand"].str.lower()
+            ebike_isna  = hellorider["Ebike Type"].isna()
+            ebike_notna = ~ebike_isna
         
-        for count, i in enumerate(fiscfree[need].index, start=1):
-            # 1.  brand & type match (the original two conditions)
-            cond = brand_low.eq(merk_low[i]) & name_low.str.contains(type_low[i], regex=False)
-            
-            # -------------------------------------------------------------
-            # 2.  bike‑type consistency
-            soort = str(fiscfree.at[i, "Soort Fiets"]).strip().lower()
-            if soort == "elektrisch":
-                cond &= ebike_notna          # Hellorider must have an Ebike Type
-            elif soort == "normaal":
-                cond &= ebike_isna           # Hellorider must *not* have Ebike Type
-            # else (unknown value) → keep the original cond unchanged
-            
-            # -------------------------------------------------------------
-            # 3.  pick the first candidate that satisfies all conditions
-            candidates = hellorider[cond]
-            if not candidates.empty:
-                fiscfree.at[i, "adviesprijs"]     = candidates["Msrp Ex Vat"].iloc[0]
-                fiscfree.at[i, "Naam Hellorider"] = candidates["Name"].iloc[0]
-            
-            progress_bar.progress(count / total)
+            progress_bar = st.progress(0)
+            total = need.sum()
+        
+            for count, i in enumerate(fiscfree[need].index, start=1):
+                # 1️ brand + type match
+                cond = brand_low.eq(merk_low[i]) & name_low.str.contains(type_low[i], regex=False)
+        
+                # 2 bike‑type consistency
+                soort = str(fiscfree.at[i, "Soort Fiets"]).strip().lower()
+                if soort == "elektrisch":
+                    cond &= ebike_notna
+                elif soort == "normaal":
+                    cond &= ebike_isna
+        
+                # 3️ first candidate that matches all conditions
+                candidates = hellorider[cond]
+                if not candidates.empty:
+                    fiscfree.at[i, "adviesprijs"]     = candidates["Msrp Ex Vat"].iloc[0]
+                    fiscfree.at[i, "Naam Hellorider"] = candidates["Name"].iloc[0]
+        
+                progress_bar.progress(count / total)
+
 
         # ---------------------------------------------------------------------
         # 4. Price incl. VAT and period tagging
@@ -300,15 +303,20 @@ if fiscfree_file:
 
         # Optional: allow user to download results as Excel
         from io import BytesIO
+
         output = BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            misgelopen_df.to_excel(writer, sheet_name="Totaal overzicht", index=False)
-            misgelopen_df_leverancier.to_excel(writer, sheet_name="Leveranciers overzicht", index=False)
-            marge_per_leverancier.to_excel(writer, sheet_name="Bestellingen verschil >15%", index=False)
-            bestelling_fraude.to_excel(writer, sheet_name="Bestellingen verkoopprijs=max_budget", index=False)
-            fiscfree.to_excel(writer, sheet_name="Alle data Fiscfree", index=False)
-            # Add other sheets as needed
-        output.seek(0)
+        
+        with st.spinner("Excel-bestand wordt gegenereerd..."):
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                misgelopen_df.to_excel(writer, sheet_name="Totaal overzicht", index=False)
+                misgelopen_df_leverancier.to_excel(writer, sheet_name="Leveranciers overzicht", index=False)
+                marge_per_leverancier.to_excel(writer, sheet_name="Bestellingen verschil >15%", index=False)
+                bestelling_fraude.to_excel(writer, sheet_name="Verkoopprijs=max_budget", index=False)
+                fiscfree.to_excel(writer, sheet_name="Alle data Fiscfree", index=False)
+                # Add other sheets as needed
+        
+            output.seek(0)
+
 
         st.download_button(
             label="Download results as Excel",

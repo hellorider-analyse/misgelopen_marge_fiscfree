@@ -207,7 +207,8 @@ if fiscfree_file:
             "aantal_bestellingen_>15%",
             "pct_delta_>15%",                           # ← after grote‑delta count
             "aantal_bestellingen_<=15%",
-            "aantal_bestellingen_>25%"
+            "aantal_bestellingen_>25%",
+            "pct_delta_>25%"
         ]
         misgelopen_df = misgelopen_df[cols]
         # Make sure the DataFrame isn’t empty first
